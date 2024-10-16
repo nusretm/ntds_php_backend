@@ -1,0 +1,7 @@
+# Logs
+_logs_iis/
+.history
+apache2_logs/
+
+# Data
+storage/
