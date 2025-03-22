@@ -1,0 +1,11 @@
+assets/
+canvaskit/
+icons/
+.last_build_id
+flutter_bootstrap.js
+flutter_service_worker.js
+flutter.js
+index.html
+main.dart.js
+manifest.json
+version.json
