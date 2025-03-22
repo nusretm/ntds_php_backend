@@ -2,5 +2,6 @@
 *
 
 # Exceptions:
+!.htaccess
 !index.php
 !index.html
