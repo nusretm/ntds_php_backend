@@ -66,8 +66,60 @@ class Device extends ApiModule {
     }
 
     public function list() {
-        $res = $qry = DB::table('devices')->select([]);
-        Response::success($res);
+        $res = $qry = DB::table('devices')->select([
+            'order' => [
+                ['title', 'ASC'],
+            ],
+        ]);
+        $response = [];
+        foreach($res as $row) {
+            $response[] = $row;
+        }
+        usort($response, function($a, $b) {
+            $coll = collator_create( 'en_US' );
+
+            if((!isset($a['title'])) || $a['title'] == '') {
+                $a['title'] = '';
+                $classroom = DB::table('classrooms')->select([ 
+                    'where' => [
+                        ['id', '=', $a['classroomId']],
+                    ],
+                ]);
+                if(count($classroom) > 0) {
+                    $a['title'] = $classroom[0]['name'];
+                }    
+            }
+            $a = $a['title'];
+            $partsA = explode(' ', $a);
+            for($i=0; $i<count($partsA); $i++) {
+                if(intval($partsA[$i]) > 0) {
+                    $partsA[$i] = str_pad($partsA[$i], 10, "0", STR_PAD_LEFT);
+                }
+            }
+            $a = implode(' ', $partsA);
+
+            if((!isset($b['title'])) || $b['title'] == '') {
+                $b['title'] = '';
+                $classroom = DB::table('classrooms')->select([ 
+                    'where' => [
+                        ['id', '=', $b['classroomId']],
+                    ],
+                ]);
+                if(count($classroom) > 0) {
+                    $b['title'] = $classroom[0]['name'];
+                }    
+            }
+            $b = $b['title'];
+            $partsB = explode(' ', $b);
+            for($i=0; $i<count($partsB); $i++) {
+                if(intval($partsB[$i]) > 0) {
+                    $partsB[$i] = str_pad($partsB[$i], 10, "0", STR_PAD_LEFT);
+                }
+            }
+            $b = implode(' ', $partsB);
+            return collator_compare( $coll, $a, $b);
+        });
+        Response::success($response);
     }
 
     public function connection() {
@@ -87,7 +139,7 @@ class Device extends ApiModule {
                 'where' => [
                     ['ip', '=', $ip],
                 ],
-            ]);    
+            ]);
             if(count($qry) > 0) {
                 $res = $qry[0];
             } else {
@@ -115,10 +167,47 @@ class Device extends ApiModule {
         }
         Response::error(7, 'Veri kaydedilemedi');
     }
+
+    public function ping() {
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $uuid = Request::post('uuid', Request::get('uuid', ''));
+        if($this->getDeviceFromUUID($deviceRec ,$uuid)) {
+            $deviceRec['ip'] = $ip;
+            $deviceRec['dtContact'] = date("Y-m-d H:i:s");
+            $deviceRec = DB::table('devices')->insertOrUpdate($deviceRec, [], true);
+
+            $res = [
+                'classroomName' => ''
+            ];
+            if(isset($deviceRec['classroomId']) && $deviceRec['classroomId'] > 0) {
+                $classroomRec = DB::table('classrooms')->select([
+                    'where' => [
+                        ['id', '=', $deviceRec['classroomId']],
+                    ],
+                ]);
+                if(count($classroomRec) > 0) {
+                    $classroomRec = $classroomRec[0];
+                    $res['classroomName'] = $classroomRec['name'];
+                }
+            }
+            Response::success($res);
+        }
+        Response::error(1, 'Cihaz kaydı bulunamadı.');
+    }
+    
+    public function delete() {
+        $this->checkToken(true);
+        $id = Request::post('id', Request::get('id', 0));
+        if($id < 1) {
+            Response::error(6, 'Parametre eksik: id');
+        }
+        $rec = DB::table('devices')->delete([], [ ['id' ,'=', $id] ], true);
+        Response::success($rec);
+    }
     
     public function save() {
         $this->checkToken(true);
-        $received = $_POST;
+        $received = json_decode($_POST['data'], true);
         if($this->getDeviceFromUUID($rec, $received['uuid'])) {
             $rec['dtDelete'] = null;
             $received = array_merge($rec, DB::table('devices')->prepareReceivedRecord($received));
@@ -151,4 +240,20 @@ class Device extends ApiModule {
         Response::success($designs);
     }
     
+    public function checkUpdate() {
+        $version = Request::post('id', Request::get('version', ''));
+        $currentWebUIVersion = $version;
+        $filenameWebUIVersion = 'ntds-ui.version';
+        if(file_exists($filenameWebUIVersion)) {
+            $currentWebUIVersion = trim(file_get_contents($filenameWebUIVersion));
+        }
+        $res = [
+            'available' => false,
+            'version' => $currentWebUIVersion,
+        ];
+        if($currentWebUIVersion != $version) {
+            $res['available'] = true;
+        }
+        Response::success($res);
+    }
 }

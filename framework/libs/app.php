@@ -96,8 +96,30 @@ class App {
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }    
 
+    public static function httpPost(string $url, Array $data) {
+        $ch = curl_init();
+    
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data) );
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        
+        // Ignore SSL Certificate errors
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        
+        $html = curl_exec($ch);
+        if (curl_errno($ch)) {
+            $html = 'ERROR: ' . curl_error($ch);
+        }
+        
+        curl_close ($ch);
+    
+        return $html;
+    }
+
     private static function loadModules() {
-        $modulesFolder = realpath(__DIR__.'/../modules');
+        $modulesFolder = realpath(__DIR__.'/../../modules');
         $files = App::scandir($modulesFolder);
         foreach($files as $file) {
             if( (!$file['isFolder']) && ($file['ext'] == 'php') && (substr($file['name'], 0, 4) == 'mod_')) {
@@ -178,7 +200,7 @@ class App {
                 $apiModule->run($apiModuleFunctionName);
             } else {
             }    
-        } elseif($uriList[0] == URI_API_BROWSER) {
+        } elseif($uriList[0] == URI_API_BROWSER && in_array($_SERVER['REMOTE_ADDR'], TRUSTED_IP_LIST)) {
             //header("Location: /admin");
             $data = [
                 'navbar' => [
@@ -250,7 +272,6 @@ class App {
             if($activeNavbarName == 'db') {
                 $activeMenuName = $activeTableName;
             }
-
             include(FOLDER_ROOT.FOLDER_THEMES.Config::$themeName."/index.php");
             exit;
         }

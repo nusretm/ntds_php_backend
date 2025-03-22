@@ -48,7 +48,7 @@ class Participant extends ApiModule {
     }
     
     public function get() {
-        $this->checkToken();
+        //$this->checkToken();
         $id = Request::post('id', Request::get('id', ''));
         if($id == '') {
             Response::error(6, 'Parametre eksik: id');
@@ -61,11 +61,27 @@ class Participant extends ApiModule {
         Response::success($res);
     }
     
+    public function delete() {
+        //$this->checkToken();
+        $id = Request::post('id', Request::get('id', ''));
+        if($id == '') {
+            Response::error(6, 'Parametre eksik: id');
+        }
+        $filename = $this->generateFilename($id);
+        if(is_file($filename)) {
+            $rec = DB::table('participants')->delete([], [ ['id' ,'=', $id] ], true);
+            unlink($filename);
+            Response::success($rec);
+        } else {
+            Response::error(6, "Veri dosyası bulunamadı $id.json");
+        }
+    }
+    
     public function import() {
         $this->checkToken(true);
         $dtBegin = Request::post('begin', Request::get('begin', ''));
         $dtEnd = Request::post('end', Request::get('end', ''));
-        $data = Request::post('data', Request::get('data', ''));
+        $data = Request::post('data', Request::get('data', ''));        
         if( ($dtBegin == '') || ($dtEnd == '') || ($data == '') ) {
             Response::error(1, 'import parametreleri eksik');
         }
@@ -73,6 +89,12 @@ class Participant extends ApiModule {
         if(is_null($data['idClassroom'])) {
             Response::error(1, 'import verisi hatalı veya eksik');
         }
+        /*
+        if(!is_dir(FOLDER_ROOT.FOLDER_STORAGE.'temp')) {
+            mkdir(FOLDER_ROOT.FOLDER_STORAGE.'temp', 0755, true);
+        }
+        file_put_contents(FOLDER_ROOT.FOLDER_STORAGE.'temp/participants-import-'.$data['idClassroom'].'.json', json_encode($data, JSON_PRETTY_PRINT));
+        */
         $recClassroom = DB::table('classrooms')->select([
             'where' => [
                 ['id', '=', $data['idClassroom']],
@@ -96,6 +118,8 @@ class Participant extends ApiModule {
         ]);
         if(count($rec) > 0) {
             $rec = $rec[0];
+            $rec['itemCount'] = $data['itemCount'];
+            $rec = DB::table('participants')->update($rec, null, true);
         } else {
             $rec = DB::table('participants')->insert($data, true);
         }
@@ -113,4 +137,60 @@ class Participant extends ApiModule {
         Response::success($data);
     }
     
+    public function deviceParticipants() {
+        $deviceUUID = Request::post('uuid', Request::get('uuid', ''));
+        if($deviceUUID == '') {
+            Response::error(1, 'Invalid device uuid');
+        }
+        
+        $qry = DB::table('devices')->select([
+            'where' => [
+                ['uuid', '=', $deviceUUID],
+            ],
+        ]);
+        if(count($qry) > 0) {
+            $deviceRec = $qry[0];
+        } else {
+            Response::error(2, 'Invalid device uuid');
+        }
+        if(is_null($deviceRec['classroomId']) || (!is_null($deviceRec['classroomId']) && ($deviceRec['classroomId'] < 1))) {
+            Response::error(3, 'Cihazın bağlı olduğu sınıf belirtilmemiş');
+        }
+        $day = date('w');
+        $startTime = strtotime(date('Y-m-d', strtotime('-'.$day.' days'))) ;
+        $list = DB::table('participants')->select([
+            'columns' =>[
+                'id', 
+                'idClassroom', 
+                //'classroomName', 
+                'dtBegin', 
+                'dtEnd', 
+                'itemCount'
+            ],
+            'where' => [
+                ['idClassroom', '=', $deviceRec['classroomId']],
+            ],
+            'order' => [
+                ['dtBegin', 'ASC'], 
+                ['dtEnd', 'ASC'], 
+                ['classroomName', 'ASC'],
+            ], 
+            'limit' => 100,
+        ]);
+        $res = [];
+        foreach($list as $item) {
+            if(strtotime($item['dtEnd']) >= $startTime) {
+                $filename = $this->generateFilename($item['id']);
+                if(file_exists($filename)) {
+                    $participants = json_decode(file_get_contents($filename), true);
+                    usort($participants['items'], function($a, $b) {
+                        $coll = collator_create( 'en_US' );
+                        return collator_compare( $coll, $a['fullName'], $b['fullName']);
+                    });
+                    $res[] = $participants;
+                }
+            }
+        }
+        Response::success($res);
+    }
 }

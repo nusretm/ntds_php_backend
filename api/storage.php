@@ -66,12 +66,28 @@ class storage extends ApiModule {
         }
         Response::success($res);
     }
+
+    public function get() {
+        $params = App::uriList();
+        array_splice($params, 0, 3);
+        $filename = implode('/', $params);
+        $filenameWithPath = FOLDER_ROOT.FOLDER_STORAGE.$filename;
+        if(is_file($filenameWithPath)) {
+            $fp = fopen($filenameWithPath, 'rb');
+            $mimeType = 'application/octet-stream';
+            header("Content-Type: $mimeType");
+            header("Content-Length: " . filesize($filenameWithPath));
+            fpassthru($fp);
+            exit;
+        }
+        http_response_code(404);
+    }
     
     public function gallery() {
         /* 
         for ImageResize:
         ----------------------------------------------------------------
-            sudo apt-get install libgd3 php-gd 
+            sudo apt-get install libgd3 php-gd
 
         for Video Thumbnails: https://github.com/PHP-FFMpeg/PHP-FFMpeg
         ----------------------------------------------------------------

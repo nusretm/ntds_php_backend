@@ -44,13 +44,27 @@ class User extends ApiModule {
                 $user = DB::table('users')->update($user, [], true);
             }
             unset($user['password']);
+            $versionFilename = 'ntds.version';
+            if(file_exists(FOLDER_ROOT.$versionFilename)) {
+                $version = file_get_contents(FOLDER_ROOT.$versionFilename);
+                $user['version'] = $version;
+            }
             Response::success($user);
         }
         Response::error(3, 'Parola hatalı');
     }
     
     public function delete() {
-        Response::error(1, 'unimplemented');
+        $this->checkToken(true);
+        $id = Request::post('id', Request::get('id', 0));
+        if($id < 1) {
+            Response::error(6, 'Parametre eksik: id');
+        }
+        if($this->user['id'] == $id) {
+            Response::error(8, 'Kendi hesabınızı silemezsiniz');
+        }
+        $rec = DB::table('users')->delete([], [ ['id' ,'=', $id] ], true);
+        Response::success($rec);
     }
     
     public function save() {

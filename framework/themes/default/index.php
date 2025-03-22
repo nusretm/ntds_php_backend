@@ -70,6 +70,9 @@
     <div class="container-fluid p-0 m-0">
         <div class="row p-0 m-0">
             <div class="btn-group dropdown-center d-md-none p-1 pt-3 pb-2">
+<?php
+    if(isset($activeMenuName)) {
+?>
                 <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <?=$data['navbar'][$activeNavbarName]['menu'][$activeMenuName]['text']?>
                 </button>
@@ -98,6 +101,10 @@
                     </ul>
                 </div>
             </nav>
+<?php
+    }
+?>
+
             <main class="col p-2 m-0 overflow-auto">
 <?php
     include($activeNavbarName.".php");

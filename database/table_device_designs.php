@@ -12,6 +12,7 @@ class tableDeviceDesigns extends dbTable {
             ['name' => 'allDevices'     , 'type' => DB::FieldTypeBoolean , 'default' => true],
             ['name' => 'name'           , 'type' => DB::FieldTypeString  , 'required' => true],
             ['name' => 'info'           , 'type' => DB::FieldTypeString  ],
+            ['name' => 'designHash'     , 'type' => DB::FieldTypeString  ],
             ['name' => 'designerWidth'  , 'type' => DB::FieldTypeInt     , 'default' => 1366],
             ['name' => 'designerHeight' , 'type' => DB::FieldTypeInt     , 'default' => 768],
             ['name' => 'timing'         , 'type' => DB::FieldTypeInt     , 'default' => 0],

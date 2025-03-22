@@ -5,6 +5,13 @@ class DeviceDesign extends ApiModule {
         parent::__construct();
     }
 
+    // public function drop() {
+        // DB::rawQuery('drop table device_designs');
+        // unlink(__DIR__.'/../storage/cache/blueprints/table_device_designs.php.cache');
+        // print("device_designs tablosu silindi!");
+        // exit;
+    // }
+
     public function list() {
         $res = [];
         $res = DB::table('device_designs')->select([
@@ -98,9 +105,17 @@ class DeviceDesign extends ApiModule {
         if(!is_dir(basename($fileName))){
             if(!mkdir(basename($fileName), 0755, true)) {
                 Response::error(8, "Klasör ouşturulamadı (chown): \n".str_replace(dirname(__DIR__).'/', '', basename($fileName)));
-            }        
+            }
         }
         file_put_contents($fileName, json_encode($data, JSON_PRETTY_PRINT));
+        $deviceDesignRec = DB::table('device_designs')->select([
+            'where' => [
+                ['id', '=', $id],
+            ],
+        ]);
+        $deviceDesignRec = $deviceDesignRec[0];
+        $deviceDesignRec['designHash'] =  hash_file('sha256', $fileName);
+        $deviceDesignRec = DB::table('device_designs')->insertOrUpdate($deviceDesignRec, [], true);
         Response::success(['id' => $id]);
     }
 }

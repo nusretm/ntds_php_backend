@@ -147,4 +147,88 @@ class Content extends ApiModule {
         Response::error(7, 'Veri silinemedi');
     }
 
+    public function deviceContent() {
+        $deviceUUID = Request::post('uuid', Request::get('uuid', ''));
+        if($deviceUUID == '') {
+            Response::error(1, 'Invalid device uuid');
+        }
+        
+        $qry = DB::table('devices')->select([
+            'where' => [
+                ['uuid', '=', $deviceUUID],
+            ],
+        ]);
+        if(count($qry) > 0) {
+            $deviceRec = $qry[0];
+        } else {
+            Response::error(2, 'Invalid device uuid');
+        }
+        $contents = DB::table('contents')->select([
+            'where' => [
+                ['active', '=', 1],
+                ['totalDuration', '>', 0],
+            ],
+            'order' => [
+                ['timing', 'asc'],
+                ['priority', 'desc'],
+                ['dtStart', 'asc'],
+                ['tmStartHour', 'asc'],
+                ['tmStartMin', 'asc'],
+                ['dtCreate', 'asc'],
+            ],
+        ]);
+        $res = [];
+        foreach($contents as $content) {
+            $contentItems = DB::table('content_items')->select([
+                'where' => [
+                    ['idContent', '=', $content['id']],
+                    ['active', '=', 1],
+                ],
+                'order' => [
+                    ['priority', 'desc'],
+                    ['dtCreate', 'asc'],
+                ],
+            ]);
+            $deviceContentItems = [];
+            foreach($contentItems as $item) {
+                if(($item['properties'] == '') || ($item['properties'] == null)) {
+                    $item['properties'] == ['mimeType' => '', 'width' => 0, 'height' => 0];
+                }
+                $item['properties'] = json_decode($item['properties'], true);
+                $filename = '';
+                $fileSize = 0;
+                switch($item['itemType']) {
+                    case 0: //Image
+                        $filename = FOLDER_STORAGE.'gallery/images/'.$item['properties']['name'];
+                        $fileSize = filesize(FOLDER_ROOT.FOLDER_STORAGE.'gallery/images/'.$item['properties']['name']);
+                        break;
+                    case 1: //Video
+                        $filename = FOLDER_STORAGE.'gallery/videos/'.$item['properties']['name'];
+                        $fileSize = filesize(FOLDER_ROOT.FOLDER_STORAGE.'gallery/videos/'.$item['properties']['name']);
+                        break;
+                }
+                $deviceContentItem = [
+                    'id' => $item['id'],
+                    'active' => $item['active'],
+                    'priority' => $item['priority'],
+                    'duration' => $item['duration'],
+                    'itemType' => $item['itemType'],
+                    'content' => $item['content'],
+                    'mimeType' => $item['properties']['mimeType'],
+                    'width' => $item['properties']['width'],
+                    'height' => $item['properties']['height'],
+                    'filename' => $filename,
+                    'fileSize' => $fileSize,
+                ];
+                if(isset($item['properties']['participantShowNumber'])) $deviceContentItem['participantShowNumber'] = $item['properties']['participantShowNumber'];
+                if(isset($item['properties']['participantShowTitle'])) $deviceContentItem['participantShowTitle'] = $item['properties']['participantShowTitle'];
+                if(isset($item['properties']['participantShowCommission'])) $deviceContentItem['participantShowCommission'] = $item['properties']['participantShowCommission'];
+                if(isset($item['properties']['participantShowWorkplace'])) $deviceContentItem['participantShowWorkplace'] = $item['properties']['participantShowWorkplace'];
+                $deviceContentItems[] = $deviceContentItem;
+            }
+            $content['items'] = $deviceContentItems;
+            $res[] = $content;
+        }
+        Response::success($res);
+    }
 }

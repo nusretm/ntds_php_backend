@@ -18,7 +18,7 @@ class DB {
     const FieldTypeTime = 'time';
     const FieldTypeDateTime = 'datetime';
     
-    private static $driver, $tables;
+    private static $driver, $tables = [];
     public static function params()
     {
         return ['driver' => Config::$dbDriver, 'database' => Config::$dbDatabase, 'username' => Config::$dbUsername, 'password' => Config::$dbPassword];

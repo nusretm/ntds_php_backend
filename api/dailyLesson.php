@@ -16,20 +16,20 @@ class DailyLesson extends ApiModule {
     }
 
     public function calendar() {
-        $dateStart = strtotime(Request::post('start', Request::get('start', date('d.m.Y'))));
-        $dateEnd = strtotime(Request::post('end', Request::get('end', date('d.m.Y'))));
+        $dateStart = strtotime(Request::post('start', Request::get('start', date('Y-m-d'))));
+        $dateEnd = strtotime(Request::post('end', Request::get('end', date('Y-m-d'))));
         $path = $this->storagePath();
         $date = $dateStart;
         $res = [];
         do {
             $dailyLesson = [
-                'date' => date('d.m.Y', $date),
+                'date' => date('Y-m-d', $date),
                 'classrooms' => 0,
             ];
-            if(is_dir($path.date('d.m.Y', $date))) {
-                $files = scandir($path.date('d.m.Y', $date), 1);
+            if(is_dir($path.date('Y-m-d', $date))) {
+                $files = scandir($path.date('Y-m-d', $date), 1);
                 foreach($files as $file) {
-                    $filename = $path.date('d.m.Y', $date).'/'.$file;
+                    $filename = $path.date('Y-m-d', $date).'/'.$file;
                     print "$filename\n";
                     if(is_file($filename) && substr($file, -5) == '.json') {
                         $dailyLesson['classrooms']++;
@@ -37,7 +37,7 @@ class DailyLesson extends ApiModule {
                 }
             }
             $res[] = $dailyLesson;
-            //print date('d.m.Y', $dailyLesson['date'])." - ".count($dailyLesson['classrooms'])." sınıf -> ";
+            //print date('Y-m-d', $dailyLesson['date'])." - ".count($dailyLesson['classrooms'])." sınıf -> ";
             //print json_encode($dailyLesson['classrooms']);
             //print "<hr>";
             $date = strtotime("+1 day", $date);
@@ -46,21 +46,60 @@ class DailyLesson extends ApiModule {
     }
 
     public function listDay() {
-        $date = strtotime(Request::post('date', Request::get('date', date('d.m.Y'))));
+        $date = strtotime(Request::post('date', Request::get('date', date('Y-m-d'))));
         $path = $this->storagePath();
         $res = [];
-        if(is_dir($path.date('d.m.Y', $date))) {
-            $files = scandir($path.date('d.m.Y', $date), 1);
+        if(is_dir($path.date('Y-m-d', $date))) {
+            $files = scandir($path.date('Y-m-d', $date), 1);
             foreach($files as $file) {
-                $filename = $path.date('d.m.Y', $date).'/'.$file;
+                $filename = $path.date('Y-m-d', $date).'/'.$file;
                 if(is_file($filename) && substr($file, -5) == '.json') {
                     $res[] = json_decode(file_get_contents($filename), true);
                 }
             }
         }
-        //print date('d.m.Y', $dailyLesson['date'])." - ".count($dailyLesson['classrooms'])." sınıf -> ";
+        //print date('Y-m-d', $dailyLesson['date'])." - ".count($dailyLesson['classrooms'])." sınıf -> ";
         //print json_encode($dailyLesson['classrooms']);
         //print "<hr>";
+        Response::success($res);
+    }
+    
+    public function deviceLessons() {
+        $deviceUUID = Request::post('uuid', Request::get('uuid', ''));
+        if($deviceUUID == '') {
+            Response::error(1, 'Invalid device uuid');
+        }
+        
+        $qry = DB::table('devices')->select([
+            'where' => [
+                ['uuid', '=', $deviceUUID],
+            ],
+        ]);
+        if(count($qry) > 0) {
+            $deviceRec = $qry[0];
+        } else {
+            Response::error(2, 'Invalid device uuid');
+        }
+        if(is_null($deviceRec['classroomId']) || (!is_null($deviceRec['classroomId']) && ($deviceRec['classroomId'] < 1))) {
+            Response::error(3, 'Cihazın bağlı olduğu sınıf belirtilmemiş');
+        }
+        $deviceClassFilename = $deviceRec['classroomId'].'.json';
+
+        $day = date('w');
+        $dateStart = date('Y-m-d', strtotime('-'.$day.' days'));
+
+        $dirs = scandir($this->storagePath(), 1);
+        $res = [];
+        foreach ($dirs as $dir) {
+            if($dir == '.' || $dir == '..' || $dir < $dateStart) {
+                continue;
+            }
+            $filename = $this->storagePath().$dir.'/'.$deviceClassFilename;
+            if(file_exists($filename)) {
+                $res[date('Y-m-d', strtotime($dir))] = json_decode(file_get_contents($filename), true);
+                $res[date('Y-m-d', strtotime($dir))]['rawDate'] = date('Y-m-d', strtotime($dir));
+            }
+        }
         Response::success($res);
     }
 
@@ -97,7 +136,7 @@ class DailyLesson extends ApiModule {
             }
             $classroom = DB::table('classrooms')->insertOrUpdate($classroom, [], true);
             $plan['idClassroom'] = $classroom['id'];
-            $filename = $this->generateFilename($plan['idClassroom'], $plan['date']);
+            $filename = $this->generateFilename($plan['idClassroom'], date('Y-m-d', strtotime($plan['date'])));
             if(!is_dir(dirname($filename))) {
                 if(!mkdir(dirname($filename), 0755, true)) {
                     Response::error(8, "Klasör ouşturulamadı (chown): \n".str_replace(dirname(__DIR__).'/', '', dirname($filename)));
